@@ -7,6 +7,11 @@ generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
   output          = "../generated/client"
+  // "native" covers local dev; the musl target is what actually runs inside
+  // our Alpine-based Docker images (apps/api/Dockerfile) — without it here,
+  // a container rebuilt on a host with a different native target could
+  // silently ship an engine that doesn't match the Alpine runtime.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

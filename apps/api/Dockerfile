@@ -1,4 +1,8 @@
 FROM node:20-alpine AS base
+# Prisma's query/schema engines need OpenSSL to be present to detect the
+# right build to use — without it they fail with a cryptic "not valid JSON"
+# error instead of a clear "libssl not found" one. Alpine doesn't ship it.
+RUN apk add --no-cache openssl
 RUN corepack enable
 WORKDIR /repo
 
