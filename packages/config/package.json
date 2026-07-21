@@ -1,0 +1,28 @@
+{
+  "name": "@openspace-db/config",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "tsconfig",
+    "eslint"
+  ],
+  "exports": {
+    "./eslint": "./eslint/base.js",
+    "./eslint/react": "./eslint/react.js",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/library.json": "./tsconfig/library.json",
+    "./tsconfig/react.json": "./tsconfig/react.json"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.13",
+    "typescript-eslint": "^8.11.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

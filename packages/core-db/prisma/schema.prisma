@@ -1,0 +1,268 @@
+// Control-plane schema — see docs/DATABASE.md and ADR-0007/ADR-0008.
+// This Prisma schema owns ONLY the `openspace` schema. Tables outside of it
+// (the user's own data) are never modeled here — see packages/core-db/src/introspection
+// and ADR-0007 for why raw `pg` + information_schema is used instead.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+  output          = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["openspace"]
+}
+
+enum RoleName {
+  Owner
+  Admin
+  Developer
+  ReadOnly
+  ServiceAccount
+
+  @@schema("openspace")
+  @@map("role_name")
+}
+
+enum PluginKind {
+  library
+  service
+
+  @@schema("openspace")
+  @@map("plugin_kind")
+}
+
+enum PluginStatus {
+  discovered
+  installing
+  installed
+  migrating
+  enabled
+  disabled
+  uninstalling
+  error
+
+  @@schema("openspace")
+  @@map("plugin_status")
+}
+
+enum AuditActorType {
+  user
+  service_account
+
+  @@schema("openspace")
+  @@map("audit_actor_type")
+}
+
+enum AuditResult {
+  ok
+  denied
+  error
+
+  @@schema("openspace")
+  @@map("audit_result")
+}
+
+enum Environment {
+  development
+  staging
+  production
+
+  @@schema("openspace")
+  @@map("environment")
+}
+
+enum BackupStatus {
+  pending
+  completed
+  failed
+
+  @@schema("openspace")
+  @@map("backup_status")
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String?   @map("password_hash")
+  name         String?
+  avatarUrl    String?   @map("avatar_url")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  userRoles UserRole[]
+  sessions  Session[]
+  apiKeys   ApiKey[]   @relation("ApiKeyCreatedBy")
+
+  @@map("users")
+  @@schema("openspace")
+}
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        RoleName @unique
+  description String?
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+  apiKeys         ApiKey[]
+
+  @@map("roles")
+  @@schema("openspace")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+  @@schema("openspace")
+}
+
+model RolePermission {
+  id       String @id @default(uuid()) @db.Uuid
+  roleId   String @map("role_id") @db.Uuid
+  resource String
+  action   String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@map("role_permissions")
+  @@schema("openspace")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+  @@schema("openspace")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  tokenHash   String    @unique @map("token_hash")
+  roleId      String    @map("role_id") @db.Uuid
+  scopes      String[]
+  createdById String?   @map("created_by") @db.Uuid
+  expiresAt   DateTime? @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  role      Role  @relation(fields: [roleId], references: [id])
+  createdBy User? @relation("ApiKeyCreatedBy", fields: [createdById], references: [id])
+
+  @@map("api_keys")
+  @@schema("openspace")
+}
+
+model Plugin {
+  id           String       @id
+  version      String
+  type         PluginKind
+  status       PluginStatus @default(discovered)
+  installedAt  DateTime?    @map("installed_at")
+  enabledAt    DateTime?    @map("enabled_at")
+  errorMessage String?      @map("error_message")
+
+  config     PluginConfig?
+  migrations MigrationHistory[]
+  containers Container[]
+
+  @@map("plugins")
+  @@schema("openspace")
+}
+
+model PluginConfig {
+  pluginId String @id @map("plugin_id")
+  config   Json   @default("{}")
+
+  plugin Plugin @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+
+  @@map("plugin_configs")
+  @@schema("openspace")
+}
+
+model AuditLog {
+  id             String         @id @default(uuid()) @db.Uuid
+  actorType      AuditActorType @map("actor_type")
+  actorId        String         @map("actor_id") @db.Uuid
+  action         String
+  resource       String
+  paramsRedacted Json           @default("{}") @map("params_redacted")
+  result         AuditResult
+  ip             String?
+  environment    Environment
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([actorId, createdAt])
+  @@index([resource, action])
+  @@map("audit_log")
+  @@schema("openspace")
+}
+
+model Project {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  environment Environment @default(development)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("projects")
+  @@schema("openspace")
+}
+
+model Container {
+  id                String    @id @default(uuid()) @db.Uuid
+  serviceName       String    @unique @map("service_name")
+  pluginId          String?   @map("plugin_id")
+  status            String
+  lastHealthCheckAt DateTime? @map("last_health_check_at")
+
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+
+  @@map("containers")
+  @@schema("openspace")
+}
+
+model Backup {
+  id          String       @id @default(uuid()) @db.Uuid
+  database    String
+  sizeBytes   BigInt?      @map("size_bytes")
+  status      BackupStatus @default(pending)
+  storagePath String?      @map("storage_path")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  createdBy   String?      @map("created_by") @db.Uuid
+
+  @@map("backups")
+  @@schema("openspace")
+}
+
+model MigrationHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  pluginId  String?  @map("plugin_id")
+  name      String
+  appliedAt DateTime @default(now()) @map("applied_at")
+
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+
+  @@map("migrations_history")
+  @@schema("openspace")
+}

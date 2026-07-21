@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: openspace
+          POSTGRES_PASSWORD: openspace
+          POSTGRES_DB: openspace
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U openspace -d openspace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://openspace:openspace@localhost:5432/openspace?schema=openspace
+      JWT_SIGNING_SECRET: ci-only-secret-not-used-in-production-00000000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @openspace-db/core-db db:generate
+
+      - name: Apply control-plane migrations
+        run: pnpm --filter @openspace-db/core-db db:migrate:deploy
+
+      - name: Lint (affected)
+        run: pnpm turbo run lint --filter=...[origin/main]
+
+      - name: Typecheck (affected)
+        run: pnpm turbo run typecheck --filter=...[origin/main]
+
+      - name: Test (affected)
+        run: pnpm turbo run test --filter=...[origin/main]
+
+      - name: Build (affected)
+        run: pnpm turbo run build --filter=...[origin/main]

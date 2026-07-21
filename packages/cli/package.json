@@ -1,0 +1,31 @@
+{
+  "name": "openspace-db",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "openspace": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "execa": "^9.4.1",
+    "open": "^10.1.0",
+    "ora": "^8.1.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@openspace-db/config": "workspace:*",
+    "@types/node": "^22.7.5",
+    "@types/prompts": "^2.4.9",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
