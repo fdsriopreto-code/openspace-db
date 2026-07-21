@@ -16,6 +16,11 @@ COPY apps/dashboard ./apps/dashboard
 RUN pnpm --filter @openspace-db/dashboard build
 
 FROM nginx:1.27-alpine AS runtime
-COPY apps/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+# Which internal URL the API is reachable at — defaults to plain
+# docker-compose (service name "api"). Override on platforms that assign a
+# different internal hostname (EasyPanel, Coolify, Railway, ...), e.g.
+# API_UPSTREAM=http://ferramentas_openspace-db-api:4000
+ENV API_UPSTREAM=http://api:4000
+COPY apps/dashboard/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/apps/dashboard/dist /usr/share/nginx/html
 EXPOSE 80

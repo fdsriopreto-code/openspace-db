@@ -20,6 +20,10 @@ RUN pnpm --filter @openspace-db/api build
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /repo /repo
-WORKDIR /repo/apps/api
+WORKDIR /repo
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+# Applies pending control-plane migrations before starting, so the image is
+# self-sufficient on any platform (plain `docker run`, EasyPanel/Coolify/
+# Railway single-service apps, ...) — not just under our own docker-compose,
+# which used to override this via a `command:` that only it knew about.
+CMD ["sh", "-c", "pnpm --filter @openspace-db/core-db exec prisma migrate deploy --schema prisma/schema.prisma && node apps/api/dist/server.js"]
