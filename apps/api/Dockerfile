@@ -30,4 +30,10 @@ EXPOSE 4000
 # self-sufficient on any platform (plain `docker run`, EasyPanel/Coolify/
 # Railway single-service apps, ...) — not just under our own docker-compose,
 # which used to override this via a `command:` that only it knew about.
-CMD ["sh", "-c", "pnpm --filter @openspace-db/core-db exec prisma migrate deploy --schema prisma/schema.prisma && node apps/api/dist/server.js"]
+#
+# Runs from TypeScript source via tsx rather than `node dist/server.js`:
+# the internal workspace packages (core-db, auth-core, shared-types) point
+# their "main" at src/index.ts for a simpler dev/build story, and plain
+# Node can't load a .ts file — tsx is the same mechanism `pnpm dev` already
+# uses, so this keeps module resolution identical in dev and production.
+CMD ["sh", "-c", "pnpm --filter @openspace-db/core-db exec prisma migrate deploy --schema prisma/schema.prisma && pnpm --filter @openspace-db/api exec tsx src/server.ts"]
